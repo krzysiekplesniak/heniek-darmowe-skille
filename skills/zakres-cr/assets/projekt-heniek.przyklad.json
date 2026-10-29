@@ -1,0 +1,52 @@
+{
+  "wersja": 1,
+  "galaz_bazowa": "main",
+  "komendy": {
+    "testy": "npm test",
+    "typy": "npx tsc --noEmit",
+    "build": "npm run build",
+    "start": "npm run start"
+  },
+  "srodowiska": {
+    "lokalne": "http://localhost:3000",
+    "staging": "https://staging.example.com",
+    "produkcja_hosty": ["example.com", "www.example.com"]
+  },
+  "ui": {
+    "tokeny": ["src/styles/tokens.css"],
+    "kanon": "docs/design.md",
+    "komponenty": "src/components/ui"
+  },
+  "nie_sciezki": [
+    { "rodzaj": "testy", "pliki": ["tests/**", "e2e/**"] },
+    { "rodzaj": "dokumenty", "pliki": ["**/*.md", "docs/**"] },
+    { "rodzaj": "konfiguracja", "pliki": ["package.json", "package-lock.json", "tsconfig.json"] }
+  ],
+  "sciezki": [
+    {
+      "id": "P1",
+      "nazwa": "Zakup i płatność",
+      "kategoria": "pieniądze",
+      "waga": 5,
+      "pliki": ["src/app/checkout/**", "src/app/api/webhooks/**", "src/lib/payments/**"],
+      "pliki_testowe": ["src/lib/payments/**/*.test.ts"],
+      "testy": ["npm test -- payments", "npx playwright test e2e/przekliki --grep @zakup"],
+      "opis": "od koszyka do aktywnego zamówienia"
+    },
+    {
+      "id": "P2",
+      "nazwa": "Logowanie i odzyskanie dostępu",
+      "kategoria": "tożsamość i dostęp",
+      "waga": 4,
+      "pliki": ["src/app/login/**", "src/lib/auth/**", "middleware.ts"],
+      "testy": ["npm test -- auth"]
+    },
+    {
+      "id": "P3",
+      "nazwa": "Profil użytkownika",
+      "waga": 2,
+      "pliki": ["src/app/profile/**", "src/components/profile/**"],
+      "testy": ["npm test -- profile"]
+    }
+  ]
+}
