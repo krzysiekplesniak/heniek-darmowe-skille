@@ -4,6 +4,9 @@
 // metki @x, komentarze #, kroki Zakładając/Mając/Kiedy/Gdy/Wtedy/Wówczas/Oraz/I/Ale oraz Given/When/Then/And/But.
 // Linia, której parser nie rozumie wewnątrz scenariusza, jest BŁĘDEM (rzuca), a nie cicho pominiętym krokiem:
 // pominięty krok dałby zielony przeklik, który niczego nie sprawdził.
+// Blok "Reguła:" / "Rule:" jest NOTATKĄ projektową do końca pliku (ta sama semantyka co silnik projektu,
+// który go pomija). Nie jest wykonywany i jest raportowany jako "NOTATKA (nie wykonywana)". Scenariusz
+// albo krok wewnątrz notatki to błąd, bo cicho by zniknął.
 //
 // Ten sam plik kopiujesz do repo jako silnik przeklików (import z przekliki.spec.ts).
 // CLI (kontrola scenariuszy przed uruchomieniem przeglądarki):
@@ -23,7 +26,8 @@ const WZORZEC_KROKU = new RegExp(`^(${SLOWA_KROKU.map((s) => s.replace(/[.*+?^${
 const FUNKCJA = /^(?:Funkcja|Właściwość|Feature):\s*(.*)$/u;
 const TLO = /^(?:Tło|Background):/u;
 const SCENARIUSZ = /^(?:Scenariusz|Przykład|Scenario|Example):\s*(.*)$/u;
-const NIEOBSLUGIWANE = /^(?:Szablon scenariusza|Przykłady|Reguła|Założenia|Scenario Outline|Scenario Template|Examples|Scenarios|Rule):/u;
+const REGULA = /^(?:Reguła|Rule):\s*(.*)$/u;
+const NIEOBSLUGIWANE = /^(?:Szablon scenariusza|Przykłady|Założenia|Scenario Outline|Scenario Template|Examples|Scenarios):/u;
 
 /**
  * @typedef {{ slowo: string, tekst: string, linia: number }} Krok
@@ -38,16 +42,25 @@ const NIEOBSLUGIWANE = /^(?:Szablon scenariusza|Przykłady|Reguła|Założenia|S
  */
 export function parsujFeature(tresc, plik = "<tekst>") {
   /** @type {Funkcja} */
-  const funkcja = { plik, nazwa: "", opis: [], metki: [], tlo: [], scenariusze: [] };
+  const funkcja = { plik, nazwa: "", opis: [], metki: [], tlo: [], scenariusze: [], notatki_reguly: [] };
   /** @type {string[]} */
   let metki = [];
   let tryb = "przed";
   /** @type {Scenariusz | null} */
   let biezacy = null;
+  /** Blok Reguła: to notatka do końca pliku (jak w silniku projektu), nie scenariusze. @type {{nazwa: string, linia: number, linie: number} | null} */
+  let notatka = null;
   tresc.replace(/^﻿/, "").split(/\r?\n/).forEach((surowa, i) => {
     const nr = i + 1;
     const linia = surowa.trim();
     if (!linia || linia.startsWith("#")) return;
+    if (notatka) {
+      if (SCENARIUSZ.test(linia) || WZORZEC_KROKU.test(linia) || TLO.test(linia) || FUNKCJA.test(linia)) {
+        throw new Error(`${plik}:${nr} - scenariusz lub krok w bloku Reguła (notatka, nie wykonywana): "${linia}"`);
+      }
+      notatka.linie++;
+      return;
+    }
     if (linia.startsWith("@")) {
       const slowa = linia.split(/\s+/);
       if (slowa.some((s) => !s.startsWith("@"))) throw new Error(`${plik}:${nr} - linia metek zawiera coś poza metkami: "${linia}"`);
@@ -60,6 +73,15 @@ export function parsujFeature(tresc, plik = "<tekst>") {
       Object.assign(funkcja, { nazwa: m[1].trim(), metki });
       metki = [];
       tryb = "opis";
+      return;
+    }
+    m = linia.match(REGULA);
+    if (m) {
+      if (!funkcja.nazwa) throw new Error(`${plik}:${nr} - Reguła przed "Funkcja:"`);
+      if (metki.length) throw new Error(`${plik}:${nr} - metki przed Regułą nieobsługiwane (nie mają czego oznaczać)`);
+      notatka = { nazwa: m[1].trim(), linia: nr, linie: 0 };
+      funkcja.notatki_reguly.push(notatka);
+      tryb = "notatka";
       return;
     }
     if (TLO.test(linia)) {
@@ -141,7 +163,8 @@ export function przeglad(katalog, metkiKlikane = DOMYSLNE_METKI) {
     }
   }
   const scen = funkcje.flatMap((f) => f.scenariusze.map((s) => ({ plik: f.plik, nazwa: s.nazwa, metki: s.metki, kroki: f.tlo.length + s.kroki.length, klikany: czyKlikany(s, metkiKlikane) })));
-  return { kod: bledy.length ? 1 : 0, pliki: pliki.length, scenariusze: scen, klikane: scen.filter((s) => s.klikany).length, pominiete: scen.filter((s) => !s.klikany).length, bledy };
+  const notatki = funkcje.flatMap((f) => f.notatki_reguly.map((n) => ({ plik: f.plik, ...n })));
+  return { kod: bledy.length ? 1 : 0, pliki: pliki.length, scenariusze: scen, klikane: scen.filter((s) => s.klikany).length, pominiete: scen.filter((s) => !s.klikany).length, notatki_reguly: notatki, bledy };
 }
 
 function main(argv) {
@@ -159,6 +182,7 @@ function main(argv) {
   if (json) { console.log(JSON.stringify(w, null, 2)); return w.kod; }
   if (w.kod === 2) { console.error(`BRAK POMIARU: ${w.uwaga}`); return 2; }
   for (const s of w.scenariusze) console.log(`${s.klikany ? "KLIKANY " : "pominięty"} ${s.plik} :: ${s.nazwa} [${s.metki.join(" ") || "bez metki"}] kroków: ${s.kroki}`);
+  for (const n of w.notatki_reguly) console.log(`NOTATKA (nie wykonywana) ${n.plik}:${n.linia} Reguła: ${n.nazwa} (linii tekstu: ${n.linie})`);
   for (const b of w.bledy) console.error(`BŁĄD ${b}`);
   console.log(`plików: ${w.pliki}, scenariuszy: ${w.scenariusze.length}, klikanych: ${w.klikane}, pominiętych: ${w.pominiete}, błędów: ${w.bledy.length}`);
   return w.kod;

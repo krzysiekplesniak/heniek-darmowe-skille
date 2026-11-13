@@ -1,6 +1,6 @@
 ---
 name: przekliki-ogorkowe
-description: Użyj, gdy trzeba sprawdzić aplikację tak, jak klika ją człowiek - "zrób przeklik", "przeklikaj ścieżkę zakupu", "napisz scenariusz Given/When/Then", "historie użytkownika jako testy", "dopisz przeklik do tej zmiany", "czy to działa od wejścia do końca" - albo gdy testy jednostkowe są zielone, a nikt nie przeszedł ścieżki w przeglądarce. Uczy pisać scenariusze Gherkin (po polsku lub angielsku) dla ścieżek klienta i odpalać je ścisłym silnikiem Playwright: krok bez definicji NIE jest zielony, błędy zbierane do końca, produkcja zablokowana. Use when "click-through test", "gherkin", "cucumber", "BDD scenario", "user journey test", "smoke the critical path".
+description: "Użyj, gdy trzeba sprawdzić aplikację tak, jak klika ją człowiek - \"zrób przeklik\", \"przeklikaj ścieżkę zakupu\", \"napisz scenariusz Given/When/Then\", \"historie użytkownika jako testy\", \"dopisz przeklik do tej zmiany\", \"czy to działa od wejścia do końca\" - albo gdy testy jednostkowe są zielone, a nikt nie przeszedł ścieżki w przeglądarce. Uczy pisać scenariusze Gherkin (po polsku lub angielsku) dla ścieżek klienta i odpalać je ścisłym silnikiem Playwright: krok bez definicji NIE jest zielony, błędy zbierane do końca, produkcja zablokowana. Use when \"click-through test\", \"gherkin\", \"cucumber\", \"BDD scenario\", \"user journey test\", \"smoke the critical path\"."
 ---
 
 # Przekliki ogórkowe: historie klienta, które przeglądarka klika naprawdę
@@ -15,10 +15,10 @@ Zielone typy, testy jednostkowe i code review to **minimum, nie dowód**, gdy zm
 |---|---|
 | zmiana na ścieżce klienta z wagą 4-5 (pieniądze, logowanie, dostęp) | tak, zawsze |
 | zmiana stanu, który widzi kilka ekranów (koszyk, filtry, preferencje, sesja) | tak |
-| poprawka widoczna tylko na jednym ekranie | wystarczy weryfikacja w przeglądarce (skill `quick-fix-qa`) |
+| poprawka widoczna tylko na jednym ekranie | wystarczy weryfikacja w przeglądarce (skill `quick-fix-qa-plus`) |
 | logika bez UI, typy, konfiguracja | nie: test jednostkowy |
 
-Ścieżki klienta i ich wagi: `.claude/projekt-heniek.json` (wzór: `skills/zakres-cr/assets/projekt-heniek.przyklad.json`).
+Ścieżki klienta i ich wagi: `.claude/projekt-heniek.json` (wzór: `assets/projekt-heniek.przyklad.json`).
 
 ## Jak pisać scenariusz (skrót)
 
@@ -54,9 +54,11 @@ Bezpieczniki: adres bazowy nie może być produkcją (`srodowiska.produkcja_host
 
 ## Jak odpalać
 
+`<skill>` = katalog bazowy tego skilla („Base directory for this skill”: w pluginie albo `~/.claude/skills/przekliki-ogorkowe`). Polecenia wołasz z katalogu projektu klienta.
+
 ```bash
 # 1. kontrola scenariuszy bez przeglądarki (sekundy): składnia, metki, ile klikanych
-node "${CLAUDE_PLUGIN_ROOT}/skills/przekliki-ogorkowe/scripts/gherkin.mjs" e2e/przekliki
+node <skill>/scripts/gherkin.mjs e2e/przekliki
 # 2. przeklik (serwer lokalny już działa albo PRZEKLIKI_BASE_URL wskazuje staging)
 npx playwright test --config e2e/przekliki/playwright.przekliki.config.ts
 # tylko jedna ścieżka

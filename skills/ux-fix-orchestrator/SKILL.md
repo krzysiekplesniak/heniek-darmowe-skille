@@ -27,8 +27,8 @@ Zanim ruszysz kod, powiedz użytkownikowi, czym dysponujesz i **czego żadne z n
 |---|---|---|
 | tokeny i komponenty projektu | kanon TEGO projektu | wiedza ogólna |
 | `references/checklista-ux.md` (w paczce) | ogólne progi: dotyk 44 px, kontrast 4,5:1 i 3:1, siatka 4/8, stany | skaner kodu |
-| `ui-ux-pro-max` (opcjonalny, jeśli zainstalowany; MIT) | przeszukiwalna baza reguł UX, palet i checklist | skaner kodu, profiler |
-| `frontend-design` (opcjonalny, jeśli zainstalowany; Apache-2.0) | rzemiosło wykonania, kierunek estetyczny | źródło kanonu istniejącej aplikacji |
+| `ui-ux-pro-max` (opcjonalny, jeśli masz ten skill; MIT) | przeszukiwalna baza reguł UX, palet i checklist | skaner kodu, profiler |
+| `frontend-design` (opcjonalny, jeśli masz ten skill; Apache-2.0) | rzemiosło wykonania, kierunek estetyczny | źródło kanonu istniejącej aplikacji |
 | narzędzie przeglądarki (chrome-devtools MCP, Playwright MCP) | zrzuty, DOM, kontrast na żywym ekranie | zastępstwo dla osądu |
 
 Brak narzędzi opcjonalnych niczego nie blokuje: zastępuje je checklista z paczki.

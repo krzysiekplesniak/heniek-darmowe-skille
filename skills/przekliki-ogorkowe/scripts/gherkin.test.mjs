@@ -62,6 +62,54 @@ test("ściśle: nierozpoznana linia, tabele, szablony i scenariusz bez kroków r
   assert.throws(() => parsujFeature("Funkcja: X\n  @jest coś\n  Scenariusz: A\n    Kiedy x\n"), /poza metkami/);
 });
 
+// Kształt zgodny z silnikiem projektu: scenariusz, potem blok Reguła jako notatka z liniami Podpunkt do końca pliku.
+const REGULA_NOTATKA = `Funkcja: Zakup roczny
+  @jest
+  Scenariusz: Zakup
+    Zakładając, że jestem na ekranie oferty
+    Wtedy widzę cenę "89 zł"
+
+  Reguła: Każdy zakup chroni pieniądze tak samo
+    # wzorzec, nie scenariusz
+
+    Podpunkt: Kwota odpowiada tabeli cen
+    Podpunkt: Produkt to zawsze "rok"
+`;
+
+test("Reguła jako notatka: nie psuje parsowania, scenariusze przed nią działają, notatka jest zgłoszona jako nie wykonywana", () => {
+  const f = parsujFeature(REGULA_NOTATKA, "zakup.feature");
+  assert.equal(f.scenariusze.length, 1);
+  assert.equal(f.scenariusze[0].kroki.length, 2);
+  assert.equal(f.notatki_reguly.length, 1);
+  assert.equal(f.notatki_reguly[0].nazwa, "Każdy zakup chroni pieniądze tak samo");
+  assert.equal(f.notatki_reguly[0].linie, 2, "dwa Podpunkt jako tekst notatki");
+});
+
+test("Reguła: EN 'Rule:' też jest notatką; krok lub scenariusz w jej środku to błąd, nie cicho pominięty", () => {
+  const f = parsujFeature("Feature: X\n  Scenario: A\n    When coś\n    Then coś\n  Rule: opis\n    Podpunkt: tekst\n");
+  assert.equal(f.notatki_reguly.length, 1);
+  assert.throws(() => parsujFeature("Funkcja: X\n  Scenariusz: A\n    Kiedy a\n    Wtedy b\n  Reguła: R\n    Scenariusz: B\n"), /notatka, nie wykonywana/);
+  assert.throws(() => parsujFeature("Funkcja: X\n  Scenariusz: A\n    Kiedy a\n    Wtedy b\n  Reguła: R\n    Kiedy c\n"), /notatka, nie wykonywana/);
+  assert.throws(() => parsujFeature("Funkcja: X\n  Scenariusz: A\n    Kiedy a\n    Wtedy b\n  Reguła: R\n  Tło:\n    Zakładając coś\n"), /notatka, nie wykonywana/);
+});
+
+test("Reguła przed Funkcją i metki przed Regułą są błędami", () => {
+  assert.throws(() => parsujFeature("Reguła: R\n  Podpunkt: x\nFunkcja: X\n"), /przed "Funkcja:"/);
+  assert.throws(() => parsujFeature("Funkcja: X\n  @jest\n  Reguła: R\n  Podpunkt: x\n"), /metki przed Regułą/);
+});
+
+test("CLI i przeglad: plik z notatką Reguła przechodzi (kod 0) i notatka jest w raporcie", () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "gherkin-regula-"));
+  fs.writeFileSync(path.join(tmp, "zakup.feature"), REGULA_NOTATKA);
+  const w = przeglad(tmp);
+  assert.equal(w.kod, 0, w.bledy?.join("\n"));
+  assert.equal(w.notatki_reguly.length, 1);
+  const cli = spawnSync(process.execPath, [SKRYPT, tmp], { encoding: "utf8" });
+  assert.equal(cli.status, 0, cli.stderr);
+  assert.match(cli.stdout, /NOTATKA \(nie wykonywana\)/);
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
 test("przykład z assets parsuje się czysto: 2 klikane, 1 planowany", () => {
   const w = przeglad(PRZYKLAD);
   assert.equal(w.kod, 0, w.bledy?.join("\n"));

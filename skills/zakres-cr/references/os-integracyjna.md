@@ -1,44 +1,39 @@
-# Oś = ścieżka klienta, którą przechodzi zmieniony kod
+# Oś = ścieżka integracyjna
 
-Plik nie żyje w swoim katalogu. Żyje na jakiejś ścieżce: zakupu, płatności, zamówienia, logowania, odzyskania dostępu. Code review po osi to recenzja **integracyjna**: od wejścia klienta do skutku, a nie "kod w oderwaniu".
+**Oś to jedna ścieżka biznesowa, którą przechodzi zmieniony kod**, recenzowana od początku do końca jako recenzja integracyjna. Nie "bezpieczeństwo" i nie "styl". Zmiana w jednym pliku bywa widoczna dopiero w skutku na ścieżce (np. płatność -> zamówienie -> dostęp -> e-mail).
 
-## Reguły
+## Skąd bierzesz ścieżki
 
-| reguła | treść |
-|---|---|
-| liczba osi = liczba ścieżek, które diff faktycznie dotyka | zwykle 1, rzadko 2-3. Nie dokładasz osi "dla pewności" i nie dzielisz jednej ścieżki na "API / UI / testy". Kilku recenzentów-perspektyw na tym samym diffie zgłasza te same defekty kilka razy |
-| 1 agent = 1 oś | czyta zmienione pliki i ich **konsumentów** na tej ścieżce; przechodzi ją od wejścia do skutku: styki, stany błędu, dane zapisane przed zmianą |
-| test po osi, zawsze | recenzent uruchamia testy osi z pliku projektu (pole `testy` ścieżki). Brak testu = znalezisko LUKA TESTOWA, nie powód do pominięcia |
-| pliki poza ścieżkami | nie są osią; sprawdza je skrypt (typy, testy, build) albo ten sam recenzent jako dodatek |
-| diff dotyka więcej niż 3 ścieżek | limit 3 dotyczy agentów na falę, nie liczby osi: pierwsza fala bierze 3 ścieżki o najwyższej wadze (pieniądze, tożsamość, dostęp najpierw), pozostałe dostają drugą falę recenzentów w tej samej rundzie. `osie.mjs --max` dzieli ścieżki na fale, nie wycina ich. Pominąć ścieżkę wolno tylko z jawnym powodem |
-| tabela pokrycia ścieżek | obowiązkowa w planie fali i w raporcie: każda ścieżka z diffu = `zrecenzowana (fala k)` albo `pominięta: <powód>`; brak wiersza = błąd planu |
+Z konfiguracji projektu `.claude/projekt-heniek.json`, pole `sciezki` (id, nazwa, kategoria, globy plików). Jeśli lista jest pusta, wyznacz ją z użytkownikiem (2–5 ścieżek) i dopisz do konfiguracji, zanim wybierzesz osie.
 
-Jeśli lista agentów ma więcej wierszy niż dotkniętych ścieżek, to błąd planu: popraw przed startem.
+## Jak wyznaczyć zbiór plików osi
 
-## Złączenie kilku PR-ów: ZMIENIONE + KONSUMENCI + DANE
+1. Zacznij od plików **zmienionych** w zakresie.
+2. Dla każdej ścieżki z konfiguracji sprawdź, czy któryś zmieniony plik leży na niej: wyszukaj import/użycie zmienionych symboli w górę (kto wywołuje) i w dół (co wywołuje) aż do granicy ścieżki: wejście (ekran, endpoint, webhook) i wyjście (zapis do bazy, wiadomość, odpowiedź).
+3. Zbiór osi = zmienione pliki + ich bezpośredni konsumenci na ścieżce + testy ścieżki.
+4. **Lista testów osi pochodzi z mapowania plików na testy** (`mapa-testow.mjs` z `test-epiku`; bez niego wyszukanie testów, które importują pliki osi), **nie z wyboru agenta**. Agent uruchamia dokładnie tę listę; brakujący test to znalezisko klasy LUKA TESTOWA.
+5. Pliki zmienione bez żadnej ścieżki: wiersz "oś: N/D, brak ścieżki" z listą plików i krótki przegląd ogólny (nie osobna oś).
 
-Gdy recenzowanym zakresem jest wydanie albo złączenie kilku gałęzi, sam `git diff` nie wystarcza. Defekt złączenia bardzo często siedzi w pliku, **którego nikt nie zmienił**: plik zmieniony łamie kontrakt, pęka konsument spoza diffu.
+## Jeden recenzent = jedna oś
 
-| człon | jak wyznaczyć | czego szuka |
-|---|---|---|
-| 1. zmienione | `git diff --name-only <baza>...HEAD` | co złączenie dokłada wprost |
-| 2. konsumenci | z plików z (1) wyciągnij eksportowane symbole, potem `git grep -n "<symbol>"` | kto pęka, choć go nie tknięto |
-| 3. dane | dla każdego zmienionego **kontraktu** (typu, schematu, formatu zapisu): czy istnieje migracja albo wartość domyślna dla rekordów sprzed zmiany | rozjazd kodu z danymi zapisanymi wcześniej |
+Ścieżek dotkniętych jest N, recenzentów N. Recenzent dostaje: diff, listę plików osi, listę testów osi i **klasy defektów do sprawdzenia wprost w zleceniu** (nie dostaje Twojego uzasadnienia zmiany).
 
-Przykład klasy (ogólny): nowe **wymagane** pole w typie preferencji użytkownika. Typy się kompilują, testy są zielone, bo wszystkie atrapy powstały po zmianie. A w bazie tysiące starych rekordów nie mają tego klucza i każdy powracający użytkownik dostaje błąd 500. Pytanie do członu 3 brzmi zawsze: *czym to pole jest dla rekordu zapisanego wczoraj?* "null" jest dobrą odpowiedzią tylko wtedy, gdy null faktycznie tam siedzi, a nie gdy klucza nie ma wcale.
+## Klasy defektów do wpisania w zlecenie recenzenta
 
-Liczbę dotkniętych rekordów sprawdzasz **odczytem** (zapytanie tylko do odczytu, za zgodą użytkownika na dostęp do bazy), nie szacunkiem. Do tej liczby znalezisko jest hipotezą.
+- pole wychodzące do klienta bez bramki dostępu (propsy komponentu klienckiego, odpowiedź API);
+- "ciche puste": przechwycony błąd zamieniony na pustą listę albo kod błędu bazy czytany jako "ok" bez śladu w logu;
+- asercje kolejności i limitu nieobjęte testem;
+- testy wyrażeniem regularnym po źródle;
+- zdublowane stałe i wyrażenia zamiast importu;
+- rzutowanie typu na danych z bazy bez strażnika;
+- strefa czasowa w datach UI;
+- nowa wartość w unii/enumie nieobsłużona w jakimś `switch` albo mapie;
+- zmiana kształtu odpowiedzi bez aktualizacji konsumentów.
 
-## Soczewki: kod już scalony, bez diffu
+## Zasady dla recenzenta
 
-Gdy PR jest scalony, pytanie "czy ten PR jest poprawny" przestaje mieć odbiorcę. Liczy się stan, nie wkład. Wtedy zamiast recenzji per PR: audyt soczewkami ryzyka. Jeden agent na jedną soczewkę, nigdy na dwie.
-
-| soczewka | co obejmuje | czego szukać |
-|---|---|---|
-| PIENIĄDZE | checkout, webhook, uprawnienia, zamówienia, kupony | zapłacił i nie dostał; dostał i nie zapłacił; obejście parametrem żądania |
-| TOŻSAMOŚĆ I DOSTĘP | sesja, link logowania, tokeny, panel, middleware | wejście w cudzą tożsamość; podrobienie albo przedłużenie linku; kolejność reguł |
-| SILNIK I DANE | logika domeny, kontrakty, migracje | kontrakt kontra dane zapisane wcześniej; ciche gubienie; dwie ścieżki liczące to samo inaczej |
-| DANE KLIENTA | panel wewnętrzny, logi, integracje wychodzące | dane osobowe jawnym tekstem; sekret zapisany jako wartość; endpoint kosztowy bez limitu |
-| UI | ekrany klienta, komponenty, dostępność | cel dotyku 44x44, kontrast 4,5:1, szerokość 375 px, martwe okablowanie |
-
-Karmisz agenta **klasami defektów zmierzonymi w tym repo** ("sprawdź, czy da się zmienić zakres dostępu parametrem żądania: to już raz się zdarzyło"), nie ogólnikiem ("sprawdź bezpieczeństwo"). Soczewki nie zastępują recenzji **otwartych** PR-ów przed scaleniem.
+1. Każde znalezisko ma konkretne wejście lub stan i konkretny skutek; "kod mógłby być czystszy" nie jest znaleziskiem.
+2. Liczby z opisu zmiany przelicz samodzielnie (opis "we wszystkich 4 wywołaniach" bywa fałszywy).
+3. Plik czytasz z recenzowanej gałęzi (`git show origin/<gałąź>:<plik>`), nie z bieżącej kopii roboczej.
+4. Wprowadzasz defekt, który nowa bramka ma łapać, uruchamiasz ją, potwierdzasz czerwień i **cofasz** (kontrola negatywna): opis w skillu `quick-fix-qa-plus` (leży obok tego skilla), plik `kontrola-negatywna.md` w jego katalogu `references`.
+5. Nie uruchamiasz produktu, więc oddzielasz **zmierzone** od **argumentów z lektury**.

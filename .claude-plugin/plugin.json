@@ -1,12 +1,20 @@
 {
   "name": "heniek-start-darmowe",
-  "version": "0.1.0",
-  "description": "Darmowa paczka startowa Heńka: pięć skilli jakości dla każdego projektu z Claude Code. zakres-cr (code review od zakresu do jednego PR i jednej listy pytań, osie z pliku projektu), przekliki-ogorkowe (scenariusze Given/When/Then klikane w przeglądarce), quick-fix-qa (mała poprawka z briefingiem, weryfikacją w przeglądarce i recenzją), ux-fix-orchestrator (audyt i naprawa UX/UI według tokenów Twojego projektu), test-epiku (dzienna, celowana runda testów fali). Działa samodzielnie, bez VPS i bez innych pluginów.",
+  "version": "0.2.0",
+  "description": "Darmowa paczka startowa Heńka: 5 skilli jakości dla każdego projektu z Claude Code: code review z jednym PR i jedną listą pytań, naprawa z dowodem, testy fali, przekliki Given/When/Then, naprawa UX/UI według tokenów projektu. Działa samodzielnie, bez VPS i bez innych pluginów.",
   "author": {
     "name": "Heniek"
   },
   "homepage": "https://github.com/krzysiekplesniak/heniek-darmowe-skille",
   "repository": "https://github.com/krzysiekplesniak/heniek-darmowe-skille",
-  "license": "MIT",
-  "keywords": ["heniek", "code-review", "qa", "tests", "gherkin", "ux", "pl"]
+  "license": "Proprietary",
+  "keywords": [
+    "heniek",
+    "code-review",
+    "qa",
+    "tests",
+    "gherkin",
+    "ux",
+    "pl"
+  ]
 }

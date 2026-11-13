@@ -10,8 +10,8 @@
     {
       "name": "heniek-start-darmowe",
       "source": "./",
-      "description": "Darmowa paczka startowa: 5 skilli jakości (code review z jednym PR, przekliki Given/When/Then, szybka poprawka z QA, naprawa UX/UI według tokenów projektu, testy fali). Samodzielna, bez VPS.",
-      "version": "0.1.0",
+      "description": "Darmowa paczka startowa: 5 skilli jakości (code review z jednym PR, przekliki Given/When/Then, szybka poprawka z dowodem (quick-fix-qa-plus), naprawa UX/UI według tokenów projektu, testy fali). Samodzielna, bez VPS.",
+      "version": "0.2.0",
       "category": "productivity"
     }
   ]

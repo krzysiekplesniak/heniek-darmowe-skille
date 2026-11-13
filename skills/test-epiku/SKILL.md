@@ -1,55 +1,148 @@
 ---
 name: test-epiku
-description: Użyj, gdy użytkownik mówi "przetestuj epik", "przetestuj falę", "dopisz testy do tej zmiany", "testy do zadań", albo po zakodowaniu fali zadań (kilka-kilkanaście zadań jednego epiku), która potrzebuje testów, jednego celowanego przebiegu po stagingu i code review osi fali. Codzienna, MAŁA runda (ok. 15-20 minut testów): zakres z mapy zmian, stan przed, luki, nowe testy z dwiema kontrolami negatywnymi, jeden przebieg po stagingu, zapadka jakości, raport na jedną stronę. NIE do pełnego przebiegu przed wydaniem i NIE do nadrabiania pokrycia starego kodu. Use when "test this epic", "test the wave", "add tests for these changes", "targeted regression run".
+description: "Use when a wave or epic is coded and its code review is closed, and its tests must now be written and run before verify and the single PR: 'przetestuj epik', 'przetestuj falę', 'testy po CR', 'T2'. Input is the CR result (findings, test gaps). Użyj po kodzie i po CR, gdy trzeba napisać i uruchomić testy nowego kodu oraz miejsc, w których CR znalazł błąd. NOT code review (zakres-cr), NOT tests of old code (fala-pokrycia-testow, jeśli masz ten skill), NOT one named UI defect (petla-naprawa-przeklik, jeśli masz ten skill), NOT a release audit."
 ---
 
-# Test epiku: dzienna, mała, celowana runda testów fali
+# test-epiku: testy fali po CR, napisane, uruchomione, zmierzone
 
-Runda jest **codzienna i celowana**: testy wybrane z mapy zmian, nie pełna suita. Poziomy: T0 commit (szybkie kontrole), T1 PR (jednostkowe, typy, build), **T2 fala = ten skill**, T3 wydanie (pełny przebieg, osobna runda, nie ten skill).
+Testy idą PO CR, nigdy równolegle z nim. Skill nie robi CR.
 
-Komendy testów, ścieżki klienta, ich testy i adres stagingu: `.claude/projekt-heniek.json` (wzór: `skills/zakres-cr/assets/projekt-heniek.przyklad.json`). Brak pliku: pierwszym krokiem jest jego założenie z użytkownikiem, bo bez ścieżek nie ma mapy zmian.
+```
+kod (quick-fix-qa-plus) -> CR z poprawkami (zakres-cr) -> TESTY (ten skill) -> verify -> JEDEN PR
+```
 
-**Wejście:** epik albo fala (nazwa), baza git (`<baza>`) albo lista plików. Bez zakresu: `origin/<galaz_bazowa>...HEAD`.
+Poziomy: T0 commit, T1 verify, **T2 = ten skill**, T3 pełne testy (staging, noc, przycisk) poza skillem.
 
-## Kroki (kolejność twarda)
+**Zasada:** skrypt orkiestruje, model ocenia i pisze. Zakres, pomiar, detekcję, lint, metki i bramkę liczą skrypty z `scripts/`. Niczego nie liczysz z pamięci.
 
-1. **Zakres testów z mapy, nie z pamięci.**
-   ```bash
-   node "${CLAUDE_PLUGIN_ROOT}/skills/zakres-cr/scripts/osie.mjs" --zakres=<baza>...HEAD --max=10
-   ```
-   Wynik: dotknięte ścieżki klienta, ich pliki i **testy osi**. Pliki kodu "poza ścieżkami": dopisz je do ścieżki w pliku projektu albo zapisz jawny powód. Ścieżki z `bez_testow` to luki do kroku 3. Dla dotkniętych ścieżek wybierz też przekliki (`@sciezka:<id>`, skill `przekliki-ogorkowe`).
-2. **Stan przed.** Uruchom wybrane testy lokalnie: ok / czerwone / pominięte. Czerwony = HIPOTEZA: uruchom go sam 3 razy, przypisz klasę a) produkt, b) test lub niestabilność, c) środowisko. Nigdy "regresja" z samej lektury logu.
-3. **Luki.** Dotknięte pliki bez testu dostają testy w kolejności: jednostkowy na zachowaniu (woła prawdziwy kod, nie regex po źródle) -> kontrakt lub przeklik ścieżki (metka ścieżki, `@jest`).
-4. **Każdy nowy test: DWIE kontrole negatywne.** (a) zepsuj kod produkcyjny (odwrócony warunek, usunięta linia) -> test czerwony, przywróć; (b) zepsuj oczekiwanie w teście -> czerwony, przywróć. Potem test 3 razy zielony. Test, który nie czerwienieje, to deklaracja, nie bramka. Szczegóły: `references/kontrola-negatywna.md`.
-5. **Staging: raz na falę.** Gałąź fali wdrożona na staging (podgląd PR albo wspólny staging), czekasz na gotowe wdrożenie, uruchamiasz TYLKO testy i przekliki z kroku 1 (plus ścieżki pieniędzy i dostępu, jeśli fala ich dotyka). **Jeden przebieg naraz na wspólnym stagingu**: nakładające się przebiegi dzielą limity i dają fałszywe czerwienie.
-6. **Smoke ścieżek krytycznych przy pliku wspólnym.** Mapa plik -> ścieżka nie widzi zależności modułów wspólnych (narzędzia, sesja, zgoda na cookies, konfiguracja). Fala dotyka takiego pliku, pieniędzy, tożsamości albo dostępu: dołóż przekliki ścieżek o wadze 4-5, nawet jeśli mapa ich nie wskazała.
-7. **CR tylko osi fali.** Skill `zakres-cr` na zakresie fali: jeden recenzent tylko do odczytu na oś (maks. 2; oś pieniędzy lub dostępu zawsze, jeśli dotknięta), poprawiacz w tej samej fali, czysta bramka zamknięcia. Poprawki spoza fali -> osobne zadanie, nie nowy push do fali.
-8. **Zapadka.** Pokrycie i stan CR nie spadają względem stanu przed falą: ścieżek bez testów nie przybywa, testów dotkniętych ścieżek nie ubywa. 100% tylko na ścieżkach pieniędzy i dostępu.
-9. **Raport (jedna strona):**
+## Wejście i droga (etap A)
 
-| pozycja | wynik |
-|---|---|
-| testy uruchomione | ok / czerwone (z klasą a/b/c) / pominięte |
-| nowe testy | ile, każdy z dwiema kontrolami negatywnymi |
-| przebieg po stagingu | które testy i przekliki, wynik |
-| luki zostawione | które i dlaczego |
-| CR | znaleziska, SHA poprawek, link PR |
-| pytania | maks. 3, każde z rekomendacją |
+- Zakres: `baza` i `glowa` (refy git). Brak zakresu: od ostatniego SHA fali.
+- Wejście z CR: tabela fali (znaleziska, stany, SHA poprawek) i lista luk. Bramka zamknięcia CR (klucz `bramka_cr`) ma kod 0.
+- Pełna droga bez wyniku CR: STOP, najpierw `zakres-cr`. Wyjątek: właściciel jawnie pominął CR; w raporcie `CR: NIESPRAWDZONE (pominięty decyzją)`.
 
-## Pułapki
+| Droga | Kiedy | Co |
+|---|---|---|
+| **Mała (Light)** | 1 do 4 zadań, poza ścieżkami pieniędzy, tożsamości i dostępu | A, B, C robi ORK; D jeden agent; E bez osobnego weryfikatora; G i H skryptami |
+| **Pełna (Epik)** | od 5 zadań albo zmiana na ścieżce pieniędzy, tożsamości lub dostępu | cała rura A-H, agenci po ścieżkach, osobny weryfikator (etap E) |
 
-- **Produkcja w lokalnej konfiguracji.** Przed testami zapisującymi dane sprawdź, dokąd wskazuje konfiguracja (adresy, nie wartości kluczy). Testy piszące dane nigdy na produkcji.
-- **Czerwony test bywa prawdziwym defektem.** Nie osłabiasz asercji.
-- **Zmiana metki scenariusza zmienia zbiór pominiętych:** porównanie ze stanem przed po nazwach i liczbach, nie po samym "zielono".
-- **Dysk i pamięć:** buildy i przeglądarki po jednym; przy kilku GB wolnego nie budujesz, sprzątasz artefakty testów.
-- **"0 testów" bez błędu** to brak pomiaru, nie zielono: sprawdź liczbę.
+Wątpliwość = pełna. Wybór zapisz w pierwszym wierszu raportu. Miejsce pracy: okno ORK (`references/tryb-lokalny.md`) albo runner (`references/tryb-vps.md`). Rdzeń jest ten sam.
 
-## Czego ten skill NIE robi
+## Konfiguracja (fail-closed)
 
-Pełnej suity (T3), nadrabiania pokrycia starego kodu, wydania na produkcję, scalania PR (robi to użytkownik). Pojedyncza poprawka: `quick-fix-qa`. Pełny code review zakresu: `zakres-cr`.
+Skrypty czytają `.claude/projekt-heniek.json` (`--config=<plik>` nadpisuje): obiekt `testy` i tablicę `sciezki`. Klucze: `references/wymagane-skrypty.md`.
 
-## Jak sprawdzić, że runda działa
+- Brak pliku, obiektu `testy`, mapy ścieżek albo komend warstw = STOP z raportem: co brakuje i co przez to jest NIESPRAWDZONE.
+- Kod 2 = nic nie policzono. Nigdy zero luk, nigdy zielone.
+- Kod 0 z niepustym polem `niesprawdzone` = wynik częściowy, nie PASS.
 
-1. **Wsteczny test:** ostatni prawdziwy defekt z tej części aplikacji: czy zestaw z kroku 1 zawierałby test, który go łapie? Nie = popraw ścieżki w pliku projektu.
-2. **Zasiany defekt:** mutacja w dotkniętym pliku na kopii gałęzi: zestaw MUSI zaczerwienić.
-3. **Czas:** do 20 minut testów, raport do jednej strony.
+## Kroki A-H
+
+| Etap | Kto | Co robi | Koniec etapu = |
+|---|---|---|---|
+| **A. Przyjęcie** | ORK | Zakres i wejście z CR. Light: CR nie dotyczy, zapisz to jawnie | zakres i wejście zapisane |
+| **B. Pomiar PRZED** | ORK, skrypty | Mapa testów zakresu; pokrycie do pliku; wskazane testy: ok / czerwone / pominięte | liczby PRZED w pliku |
+| **C. Plan luk** | ORK | Wiersz = jedna luka z trzech źródeł: (1) nowy kod bez testu zachowania, (2) luki i POPRAWKA z CR, (3) szersze pokrycie wokół błędu. Poprawiacz z CR zostawia tylko jednorazową czerwień i kontrolę negatywną, więc trwały test regresji każdej poprawki piszesz tutaj | tabela luk: warstwa, ścieżka, plik docelowy |
+| **D. Agenci** | agenci, jawny `model` | 1 agent = 1 ścieżka klienta; tworzy tylko nowe pliki testów z koperty; autor testu inny niż autor kodu luki; nie commituje; do 3 piszących naraz | raporty; `git status` pokazuje tylko nowe pliki testów |
+| **E. Weryfikacja** | skrypty, agent (Epik) | Detektor, lint, dwie kontrole negatywne każdego nowego testu (na kopii). Epik: osobny agent ocenia, czy test woła prawdziwy kod | wyniki skryptów 0/1/2 i ocena |
+| **F. Rejestry, metki, commit** | ORK, skrypt | Rejestry testów edytuje ORK. Metki scenariuszy sprawdza `walidator-metek.mjs`. Commit z numerami luk w treści | czysta gałąź, SHA |
+| **G. Uruchomienie** | ORK, skrypty | Dopiero po zakończeniu WSZYSTKICH piszących agentów. Warstwy w kolejności (`references/warstwy-i-metki.md`). Każdy nowy test 3x solo. Warunek: uruchomionych > 0 | wynik per warstwa z kodem wyjścia |
+| **H. Pomiar PO, bramka, raport** | ORK, skrypt | Pokrycie PO, porównanie z PRZED, zapadka (zasada 6), bramka testów, zlecenie warstwy 2 przekliku | tabela + lista pytań |
+
+Komendy (`<skill>` = katalog tego skilla; `<baza>`, `<glowa>` = refy git; `<scratch>` = katalog tymczasowy sesji; ścieżki pełne):
+
+```
+# B: zakres z listy git baza...glowa (nie z drzewa roboczego)
+git diff --name-only --no-renames <baza>...<glowa> | node <skill>/scripts/mapa-testow.mjs --stdin --poziom=fala
+# B i H: pomiar pokrycia (JSON na stdout; markdown tylko do jawnej ścieżki)
+node <skill>/scripts/pokrycie-testow.mjs --zapisz=<scratch>/pokrycie-przed.md > <scratch>/pokrycie-przed.json
+# E: edycja i osłabianie istniejących testów
+node <skill>/scripts/detektor-testow.mjs --baza=<baza> --glowa=<glowa> [--wyjatki=<plik>]
+# E: nowe pliki .feature
+node <skill>/scripts/lint-scenariuszy.mjs --baza=<baza> --glowa=<glowa>
+# F: zmiany metek stanu względem bazy
+node <skill>/scripts/walidator-metek.mjs --baza=<baza> --glowa=<glowa> [--dowod-testu=<sha-lub-plik>]
+# H: bramka zamknięcia testów fali
+node <skill>/scripts/bramka-testow-fali.mjs --plan=<scratch>/plan.json [--config=<plik>] [--repo=<katalog>]
+```
+
+Kody (flagi i pułapki: `references/wymagane-skrypty.md`):
+- `mapa-testow`: 1 = ścieżka krytyczna bez testu; 2 = zero testów. Dla zakresu gałęzi `--stdin` (nie `--baza`).
+- `pokrycie-testow`: 1 = ścieżka krytyczna bez testu; 2 = zła konfiguracja.
+- `detektor-testow`: 1 = trafienia; 2 = zły ref. Nie widzi braku testów w zakresie: sprawdź `pliki_testowe`.
+- `lint-scenariuszy`: 1 = naruszenie; 2 = brak pomiaru, także zero plików `.feature`.
+- `walidator-metek`: 1 = naruszenie; 4 = STOP na decyzję właściciela; 2 = brak pomiaru. Priorytet 1 > 4 > 2 > 0.
+- `bramka-testow-fali`: tylko plik planu, który pisze ORK (nie uruchamia detektora ani lintu, nie sprawdza prawdziwości przebiegów).
+
+## Warstwy i metki
+
+Które warstwy pisze ten skill, gdzie biegną i jak działa metka `@planowane` -> `@na-galezi`: `references/warstwy-i-metki.md`. Skrót: scenariusz przed kodem ma metkę `@planowane`; ORK zmienia ją na `@na-galezi` dopiero po zielonym G (3x solo) i z dowodem. `@jest` nadaje proces wydania, nie ten skill.
+
+## Zasady twarde
+
+1. **Zakres z mapy, nie z pamięci.** Plik wspólny nie mapuje się sam na zależne ścieżki: smoke dołączasz, gdy zmiana dotyka pliku wspólnego, pieniędzy, tożsamości, zgody lub cookies.
+2. **Czerwony to hipoteza.** Uruchom solo 3 razy i nazwij klasę: (a) defekt produktu, (b) test lub niestabilność, (c) środowisko. Nigdy „regresja” z samej lektury logu. Klasa (a) to znalezisko w rejestrze CR, nie poprawka w tym skillu. Nie osłabiaj asercji.
+3. **Każdy nowy test: DWIE kontrole negatywne** (mutacja kodu na kopii; zepsute oczekiwanie) i **3x solo zielony**. Test, który nie czerwienieje, to deklaracja. Procedura: skill `quick-fix-qa-plus` (wołaj, nie kopiuj).
+4. **Test woła prawdziwy kod** tą samą ścieżką co produkcja. Regex po źródle, przypinanie nazw i kopia funkcji nie są testem zachowania.
+5. **Zero testów = NIESPRAWDZONE, nie PASS.** Każdy przebieg ma w dowodzie kod wyjścia i liczbę uruchomionych > 0.
+6. **Zapadka.** Liczba plików bez testu w zakresie nie rośnie, pokrycie dotkniętych ścieżek nie spada, względem PRZED (liczby z `pokrycie-testow`, progi w `testy.zapadka`). 100% tylko na ścieżkach pieniędzy, tożsamości i dostępu. Pokrycie to osiągalność, nie dowód zachowania.
+7. **Jeden przebieg naraz na wspólnej bazie lub stagingu.** Blokada: katalog-semafor w katalogu tymczasowym, sprawdzany przed startem.
+8. **Agenci nie commitują.** Commit robi ORK (albo runner). Sekrety: nie czytasz plików z sekretami; wartości nie trafiają do czatu ani logu.
+9. **Autor testu inny niż autor kodu luki.** Agent testów dostaje kryteria, scenariusze i listę luk; kod czyta tylko po to, by podpiąć test.
+10. **Istniejących testów nie edytujesz ani nie osłabiasz.** Agent tworzy tylko nowe pliki. Detektor wykrywa osłabienia (usunięte lub zmienione asercje, `skip`/`fixme`/`only`/`todo`). Trafienie bez wpisu w `--wyjatki` to `EDYCJA TESTU`. Bez zgody właściciela zakaz „healera” i obcych skilli.
+
+## Tryb lekki dla jednej zmiany
+
+Dotyczy zmiany w 1 pliku (drodze Light, poza pieniędzmi, tożsamością i dostępem). Gdy brakuje `.claude/projekt-heniek.json`, mapy ścieżek, rejestrów albo `docs/`, nie kończysz na STOP z kodem 2:
+
+1. **Fallback bez konfiguracji:** zakres z `git diff --name-only`, komenda testów z profilu (`komenda_testow`) albo `package.json`; pomiar PRZED/PO to uruchomienie wskazanych testów (liczba uruchomionych, kod wyjścia). Skrypty `mapa-testow`, `pokrycie-testow`, `bramka-testow-fali` pomijasz.
+2. **Jawne oznaczenie:** w raporcie linia `NIESPRAWDZONE: pokrycie, zapadka, bramka testów fali, rejestry (tryb lekki, brak konfiguracji)`. Warstwa bez przebiegu nadal jest NIESPRAWDZONE, nie PASS.
+3. **Wynik:** kod wyjścia i opis (0 = uruchomione > 0 i zielone; 1 = czerwone; 2 = nic nie uruchomiono, z opisem braków i następnym krokiem), nie samo STOP.
+
+**Kto robi kontrole negatywne w Light:** nie autor kodu testu. Robi je osobny agent (inny niż ten, który napisał test) albo koordynator (ORK), na kopii pliku i bez `git stash` (opis w skillu `quick-fix-qa-plus`, sekcja o kontroli negatywnej). Autor testu nie ocenia własnego testu.
+
+**„3x solo zielony" jest wymagane tylko w trybie Epik.** W Light wystarczy jedno uruchomienie solo zielone po obu kontrolach negatywnych; powtarzalność 3x dołożysz, gdy test dotyka czasu, sieci lub kolejności. Dwie kontrole negatywne obowiązują w obu trybach.
+
+**Komenda testów:** z profilu (`komenda_testow`) albo `package.json`, nie goły `node --test`. Przykład (nie zaszyty w skillu): `node --experimental-strip-types --import <rejestr-transpilera> --test <pliki>`, gdzie rejestr transpilera to plik projektu z `package.json`.
+
+**Git Bash na Windows:** `python3` bywa atrapą i wiesza polecenie; używaj `node`.
+
+## Limit rund napraw
+
+**1 runda pisania i uruchomienia + 1 runda napraw** (czerwone klasy b i c, uwagi weryfikatora). Trzecia runda nigdy z automatu: pytanie na liście z rekomendacją (CR końcowe linii po przekliku to osobna reguła skilla `zakres-cr` (limit rund i luka testowa), nie runda napraw testów). Znalezisko klasy (a) liczy się do wspólnego limitu fali. Limit „3 próby” dotyczy kodowania zadania, nie rundy testów.
+
+## Stan luki
+
+Każda luka kończy w dokładnie jednym stanie: `POKRYTE` (plik testu, SHA), `ISTNIEJE` (test sprzed poprawki, który już ją pokrywa, SHA), `ODLOZONE Qn` (powód; Qn na liście pytań), `NIE DOTYCZY` (powód). `OCZEKIWANA CZERWIEN` nie przechodzi zamknięcia. Warstwa bez przebiegu to NIESPRAWDZONE, nigdy PASS. Luka wymagająca zmiany kodu produktu albo wymiany słabego testu to znalezisko w rejestrze CR (POPRAWKA albo POPRAWKA TESTU).
+
+## Wyjście: tabela i pytania
+
+Tabela, zawsze te same kolumny:
+
+| Warstwa | Napisane | Uruchomione | Zielone | Czerwone (klasa) | Pominięte (powód) | Stan |
+|---|---|---|---|---|---|---|
+
+Pod nią: pomiar PRZED -> PO; luki w stanie końcowym; dowody (komenda, kod wyjścia, liczba uruchomionych, wynik bramki i walidatora); co jest NIESPRAWDZONE i dlaczego; pliki bez testu poza zakresem (do `fala-pokrycia-testow`, jeśli masz ten skill); miara tripletu (uwagi CR, błędy po CR wykryte testami, błędy po PR: `NIEZNANE` do czasu danych).
+
+**Stan warstwy:** `PASS` tylko gdy uruchomione > 0, czerwonych 0 i kod wyjścia 0. Inaczej `CZERWONE` albo `NIESPRAWDZONE`.
+
+**Pytania:** jedna lista, numerowana, każde z rekomendacją, w tej samej wiadomości co tabela. Pytasz tylko o to, co zmienia pieniądze, zgodę lub prawo, strategię, tekst dla klienta, usuwanie danych, odłożone luki i warstwy niesprawdzone. Resztę rozstrzygasz sam i zapisujesz.
+
+## Red flags: zatrzymaj się
+
+- Brak wyniku CR, mapy, pomiaru lub bramki: STOP z raportem, nie liczysz „na oko”.
+- Testy plików spoza epiku i CR (to `fala-pokrycia-testow`, jeśli masz ten skill): nie pisz.
+- Test poprawiony tak, żeby zzieleniał: `EDYCJA TESTU`, nie naprawa.
+
+## Referencje
+
+- `references/tryb-lokalny.md`: okno ORK, koperta, bariera pisania i uruchamiania, kanał pytań.
+- `references/tryb-vps.md`: job runnera, budżet, brak przeglądarki właściciela.
+- `references/wymagane-skrypty.md`: klucze konfiguracji, flagi i kody skryptów, format planu bramki, czego bramka nie sprawdza.
+- `references/kontrola-negatywna.md`: dwie kontrole na każdy nowy test (mutacja kodu, zepsute oczekiwanie), testy udające bramkę, zapis w raporcie.
+- `references/warstwy-i-metki.md`: tabela warstw, metki `@planowane` / `@na-galezi`, reguły walidatora.
+- Skille: `zakres-cr` (CR, wejście), `quick-fix-qa-plus` (kontrola negatywna, dowód), `przekliki-ogorkowe` (scenariusze); jeśli masz te skille: `przeklik-mieszany` (warstwy 1 i 2), `fala-pokrycia-testow` (stary kod), `petla-naprawa-przeklik` (jeden defekt UI), `paczka-joba` (koperta).
+
+## PROTOKOL-POSTEPU (agenci)
+
+Każdy brief agenta zlecany z tego skilla kończy się blokiem „PLAN I POSTĘP” z pliku `protokol-postepu.md` (katalog references skilla `rdzen-ork`, jeśli masz ten skill; bez niego trzymaj ten sam schemat pól: `nazwa`, `etap`, `brief`, `kroki`, `krok`, `eta_min`, `teraz`) (etap w pliku postępu: Testy|E2E). Nazwa w pliku = opis agenta; ostatni zapis `krok = liczba kroków + 1`. Brief bez bloku jest niepełny: dopisz go przed wysłaniem. Katalog plików postępu podaje zleceniodawca (nie zgaduj ścieżki).
